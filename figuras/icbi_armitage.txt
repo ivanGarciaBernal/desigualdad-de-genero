@@ -1,0 +1,7 @@
+
+	Cochran-Armitage test for trend
+
+data:  
+Z = -1.8435, dim = 3, p-value = 0.06526
+alternative hypothesis: two.sided
+

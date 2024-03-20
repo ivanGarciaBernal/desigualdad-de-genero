@@ -1,0 +1,173 @@
+---
+title: "Desigualdad de género"
+output:
+  flexdashboard::flex_dashboard
+---
+
+```{r setup}
+library(pacman)
+p_load(readxl,ggplot2,patchwork,dplyr,flexdashboard)
+```
+
+```{r}
+# Cargamos los documentos
+icbi = read_excel("./datos/ICBI.xlsx")
+pisa_giza = read_excel("./datos/PISA & GIZA.xlsx")
+mec_espejos = read_excel("./datos/MEC espejos.xlsx")
+```
+
+
+## ICBI
+
+### Veces que se percibió algún tipo de violencia, al igual o mayor que sus pares
+
+```{r}
+preguntas_violencia = c(115:146,148:151)
+violencia_icbi = icbi[,preguntas_violencia]
+num_respuestas = sapply(violencia_icbi,
+                        function(x) grepl('Si',x,fixed=TRUE),simplify = TRUE)
+
+N = sum(num_respuestas)
+valueBox(N,color = "warning")
+```
+
+### Veces que se percibió violencia más que sus pares
+```{r}
+mas_que_pares = sapply(violencia_icbi,
+                        function(x) grepl('más',x,fixed=TRUE),simplify = TRUE)
+
+M = sum(mas_que_pares)
+
+valueBox(M,color = "danger")
+
+## mujeres
+# X = icbi[,c(5,preguntas_violencia)]
+# mujeres = X %>% filter(`Mi sexo biológico es:` == 'Mujer') %>%
+#   mutate_all(~ grepl('Si',.))
+# sum(mujeres)
+# hombres = X %>% filter(`Mi sexo biológico es:` == 'Hombre') %>%
+#   mutate_all(~ grepl('Si',.))
+# sum(hombres)
+```
+
+
+### Años de nacimiento
+
+```{r cache=TRUE}
+años_nac = unlist(lapply(icbi[,6],as.numeric))
+# hist(años_nac,xlab = "Años de nacimiento",
+#      ylab="Frecuencia",main="Histograma años de nacimiento")
+df = na.omit(data.frame(años = as.vector(años_nac)))
+p = ggplot(df,aes(x = años)) + geom_histogram(bins=25)+
+  ylab("Número de personas") +
+  xlab("Edades")
+
+generaciones = as.integer(cut(años_nac, breaks = c(1946,1965,1981)))
+# barplot(table(generaciones),
+#         main = "Generaciones",
+#         ylab="Número de personas",
+#         names.arg = c("Baby Boomers","Generación X"))
+
+gen_df = as.data.frame(table(generaciones))
+q = ggplot(gen_df,aes(x=generaciones,y=Freq)) +
+  geom_bar(stat = "identity") +
+  xlab("Generaciones") + 
+  ylab("Frecuencia") +
+  scale_x_discrete(breaks = c(1,2),
+                   labels = c("Baby Boomers", "Generación X"))
+
+p + q
+```
+
+<!-- ### Referencia de generaciones -->
+<!-- Ahora contabilizados por generaciones tomando en cuenta -->
+<!-- los siguientes rangos para categorizar las generaciones -->
+
+<!-- |año| nombre| -->
+<!-- |---+-------| -->
+<!-- |1946-1964|	Baby Boomers| -->
+<!-- |1965-1980|	Generación X| -->
+<!-- |1981-1996|	Millennials| -->
+
+<!-- ### Distribución de generaciones -->
+
+
+Column
+-----------------------------
+
+### Sexo vs Violencia percibida
+```{r results = 'hide', cache=TRUE}
+## una funcion que será válida para las preguntas siguientes:
+## 115 ~ 146
+## 148 ~ 151
+sexo_vs_conflicto = function(w){
+df = as.data.frame(table(c(icbi[,5],icbi[,w])))
+names(df) = c("Sexo", "Respuestas", "Frecuencia")
+ggplot(df,aes(fill=Sexo,y=Respuestas,x=Frecuencia)) +
+  geom_bar(position = "dodge",stat="identity") +
+  labs(title = "ICBI",
+       subtitle = paste(strwrap(colnames(icbi[,w]), width = 50), collapse = '\n') ) +
+  theme(plot.title = element_text(size=15))
+}
+
+valido = function(x){
+  y = na.omit(x)
+  if(length(which(y == "No")) == dim(y)[1]){
+    return(FALSE)
+  }else{
+  return(TRUE)
+  }
+}
+
+solo_validos = function(x){
+  if(valido(icbi[,x])){
+    sexo_vs_conflicto(x)
+  }
+}
+
+preguntas_violencia = c(115:146,148:151)
+lapply(preguntas_violencia,sexo_vs_conflicto)
+```
+
+
+### Generaciones vs violencia percibida
+```{r results = 'hide', cache=TRUE}
+edad = as.numeric(unlist(icbi[,6]))
+generacion = as.integer(cut(edad ,breaks = c(1946,1965,1981)))
+generacion[generacion == 1] = "Baby Boomer"
+generacion[generacion == 2] = "Generación X"
+generacion_vs_conflicto = function(w){
+df = as.data.frame(table(cbind(generacion,icbi[,w])))
+names(df) = c("Generacion", "Respuestas", "Frecuencia")
+ggplot(df,aes(fill=Generacion,y=Respuestas,x=Frecuencia)) +
+  geom_bar(position = "dodge",stat="identity") +
+  labs(title = "ICBI",
+       subtitle = paste(strwrap(colnames(icbi[,w]), width = 50), collapse = '\n') ) +
+  theme(plot.title = element_text(size=15))
+}
+valido = function(x){
+  y = na.omit(x)
+  if(length(which(y == "No")) == dim(y)[1]){
+    return(FALSE)
+  }else{
+  return(TRUE)
+  }
+}
+
+validos = function(x){
+  if(valido(icbi[,x])){
+    generacion_vs_conflicto(x)
+  }
+}
+
+lapply(preguntas_violencia, validos)
+```
+## Registrando violencia
+```{r}
+X = icbi[,c(5,preguntas_violencia)]
+# X %>% filter(`Mi sexo biológico es:` == 'Mujer')
+
+```
+
+
+

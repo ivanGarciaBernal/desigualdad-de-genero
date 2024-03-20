@@ -1,0 +1,53 @@
+---
+title: "Pruebas estadisticas"
+author: "Iván García"
+date: "2023-12-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(pacman)
+p_load(readxl,DescTools,dplyr,tidyr)
+```
+
+```{r}
+icbi = read_excel("./datos/ICBI.xlsx")
+icbi = icbi %>% na.omit()
+
+preguntas_violencia = c(115:146,148:151)
+
+sexo = icbi %>% select(starts_with('Mi sexo'))
+preguntas = icbi[,preguntas_violencia]
+colnames(sexo) = "sexo"
+prueba = function(x){
+  tab = table(bind_cols(sexo,preguntas[,x]))
+  X = CochranArmitageTest(tab,alternative = "two.sided")
+  if(X$p.value < 0.05){
+    print(x)
+  }
+}
+
+cuenta_positivos = function(x){
+  return(any(grepl('Si, Igual|Si, más',x, perl = TRUE)))
+}
+
+cuenta_mayor_que_pares = function(x){
+  return(any(grepl('Si, más',x, perl = TRUE)))
+}
+vcuenta = Vectorize(cuenta_positivos)
+X = bind_cols(sexo,preguntas)
+positivos = tibble(positivos = apply(X,1,cuenta_positivos))
+positivos_estrictos = tibble(positivos = apply(X,1,cuenta_mayor_que_pares))
+Z = bind_cols(sexo,positivos)
+W = bind_cols(sexo,positivos_estrictos)
+colnames(W) = c("sexo", "positivos")
+colnames(Z) = c("sexo", "positivos")
+Z = Z %>% group_by(sexo) %>% summarise(cuenta = sum(positivos))
+poblacion = sexo %>% group_by(sexo) %>% summarise(numero = n())
+W = W %>% group_by(sexo) %>% summarise(cuenta = sum(positivos))
+violentados_2 = W$cuenta
+violentados <- Z$cuenta
+totales <- poblacion$numero
+prop.test(violentados, totales)
+prop.test(violentados_2,totales)
+```

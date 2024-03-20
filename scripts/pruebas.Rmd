@@ -1,0 +1,157 @@
+---
+title: "pruebas"
+author: "Iván García"
+date: "2024-02-12"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+library(pacman)
+p_load(dplyr,DescTools,rstatix)
+load(file = "limpios/datos.RData")
+```
+## Notas
+El nivel de significancia de estas pruebas es del 90%
+## ICBI
+
+### Test Cochran-Armitage
+Esta prueba busca la influencia existente entre el género del individuo
+y la respuesta que tiene frente a preguntas sobre violencia
+```{r icbi-armitage}
+## Esta función acepta dos parametros, que pueden ser df 
+armitage_test = function(dic_var,ord_var){
+  x = as.matrix(dic_var)
+  y = as.matrix(ord_var)
+  tab = table(x,y)
+  c = CochranArmitageTest(tab)
+  return(c)
+}
+
+repite_armitage = function(variables,grupo){
+  for(i in 1:ncol(variables)){
+  t = armitage_test(variables[,i],grupo)
+  p = t$p.value
+  if(!is.na(p) && p < 0.1){
+    print(colnames(variables)[i])
+    print(t)
+  }
+}
+}
+
+icbi_violencia = icbi %>% select(starts_with("Dentro de mi centro laboral yo he enfrentado"))
+icbi_genero = icbi$`Mi sexo biológico es:`
+
+repite_armitage(icbi_violencia,icbi_genero)
+
+#exportando
+imprime_armitage <- function(pregunta,grupo,output,titulo){
+  p = armitage_test(pregunta,grupo)
+  out = paste(titulo,p$method,
+  paste("Z =",
+        round(p$statistic,digits = 3)
+        ,",dim =",
+        p$parameter
+        ,",p-value = ",
+        round(p$p.value,digits = 3)),sep = "\n")
+  writeLines(out,con = file(paste0("figuras/",output)))
+}
+
+imprime_armitage(icbi_violencia$`Dentro de mi centro laboral yo he enfrentado algo de lo siguiente [Me manosean o tocan]`,
+                 icbi_genero,
+                 "icbi_armitage.tex",
+                 "Dentro de mi centro laboral yo he enfrentado algo de lo siguiente [Me manosean o tocan]")
+
+writeLines(capture.output(print(p)),con = file("figuras/icbi_armitage.txt"))
+
+```
+El test de Cochran-Armitage devuelve una tendencia en esta pregunta
+sin embargo veremos que hay si observamos las respuestas a esta pregunta
+```{r}
+p_load(knitr)
+pregunta = icbi_violencia$`Dentro de mi centro laboral yo he enfrentado algo de lo siguiente [Me manosean o tocan]`
+t = table(icbi_genero,pregunta)
+
+print(xtable(t, label = "icbi_tabla",
+             caption = "La población de ICBI, responde si ha tenido que
+             enfrentarse a manoseo o tocamiento dentro del area laboral"),file="figuras/icbi_tabla.tex")
+kable(t,caption = "Me manosean o tocan")
+```
+En este caso vemos que el grupo afectado es el de las mujeres
+### Kruskal-Wallis
+Optaremos por una prueba no parametrica ya que tenemos
+el caso de respuestas cargadas por varias respuestas negativas en su mayoría
+lo que indica una ausencia de la normalidad
+Falta justificar esto con estadística descriptiva
+```{r icbi-kruskal}
+reemplaza = function(respuestas){
+  x = respuestas %>% 
+  mutate_all(~ replace(.,.=="No","0")) %>%
+  mutate_all(~ replace(.,.=="Si, menos que a mis compañeras/os","0.25")) %>%
+  mutate_all(~ replace(.,.=="Si, Igual que a mis compañeras/os","0.5")) %>%
+  mutate_all(~ replace(.,.=="Si, más que a mis compañeras/os","0.75")) %>%
+  mutate_all(~ replace(.,.=="Si","1")) %>%
+  mutate_if(is.character,as.numeric)
+  return(x)
+}
+
+repite_kruskal = function(datos,grupo){
+  for(i in 1:ncol(datos)){
+  k = kruskal.test(as.numeric(unlist(datos[,i])) ~ grupo)
+  if(!is.na(k$p.value) && k$p.value < 0.1){
+    print(colnames(datos)[i])
+    print(k)
+  }
+}
+}
+
+dbl_icbi = reemplaza(icbi_violencia)
+repite_kruskal(dbl_icbi,icbi_genero)
+```
+## MEC espejos
+
+### Cochran-Armitage 
+```{r}
+espejos_violencia = espejos %>% select(starts_with("Dentro de mi centro laboral yo he enfrentado"))
+espejos_genero = espejos$`Mi sexo biológico es:`
+
+repite_armitage(espejos_violencia,espejos_genero)
+```
+Ahora veremos sobre los grupos afectados estos rubros
+```{r}
+pregunta_1 = espejos_violencia$`Dentro de mi centro laboral yo he enfrentado algo de lo siguiente [Me ponen sobrenombres o apodos]`
+pregunta_2 = espejos_violencia$`Dentro de mi centro laboral yo he enfrentado algo de lo siguiente [Siento que se me impide expresarme]`
+
+t1 = table(espejos_genero,pregunta_1)
+t2 = table(espejos_genero,pregunta_2)
+
+print(xtable(t,caption = "La población de MEC Espejos responde
+             si le han puesto apodos en el entorno laboral"),file="figuras/mec_tabla1.tex")
+print(xtable(t,caption = "La poblacíon de MEC Espejos responde
+             si le han inhibido el derecho a la expresión en el trabajo"),file="figuras/mec_tabla2.tex")
+
+
+kable(t1,caption = "Me ponen sobrenombres o apodos")
+kable(t2,caption = "Siento que se me impide expresarme")
+```
+
+### Kruskal-Wallis
+
+```{r}
+dbl_espejos = reemplaza(espejos_violencia)
+repite_kruskal(dbl_espejos,espejos_genero)
+```
+## PIZA & GIZA
+
+### Cochran-Armitage
+```{r}
+piza_violencia = piza %>% select(starts_with("Dentro de mi centro laboral yo he enfrentado"))
+piza_genero = piza$`Mi sexo biológico es:`
+repite_armitage(piza_violencia,piza_genero)
+```
+### Kruskal-Wallis
+```{r}
+dbl_piza = reemplaza(piza_violencia)
+repite_kruskal(dbl_piza,piza_genero)
+```
